@@ -1,0 +1,95 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "cyclopts>=3,<5",
+#   "plexapi>=4.17,<5",
+# ]
+# ///
+"""Create one Plex smart playlist for each genre in a music library."""
+
+from __future__ import annotations
+
+import sys
+import tomllib
+from pathlib import Path
+
+import cyclopts
+from plexapi.exceptions import NotFound
+from plexapi.server import PlexServer
+
+DEFAULT_CONFIG = Path.home() / ".config/plex-genre-playlists/config.toml"
+app = cyclopts.App(help="Create genre-based smart playlists in a Plex music library.")
+
+
+@app.default
+def main(
+    config: Path = DEFAULT_CONFIG,
+    library: str | None = None,
+    apply: bool = False,
+) -> None:
+    """Preview playlists by default; pass --apply to create them.
+
+    Reads Plex connection settings from a TOML config file. Existing playlist
+    titles are left untouched, making repeated runs safe.
+    """
+    if not config.is_file():
+        print(
+            f"Configuration file not found: {config}\n"
+            "Copy config.example.toml to this path and fill in the [plex] settings.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
+    try:
+        with config.open("rb") as config_file:
+            settings = tomllib.load(config_file)["plex"]
+        url = settings["base_url"]
+        token = settings["token"]
+        library_name = library or settings.get("default_library", "Music")
+    except (KeyError, tomllib.TOMLDecodeError) as exc:
+        print(f"Invalid Plex configuration in {config}: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+
+    plex = PlexServer(url, token)
+    try:
+        section = plex.library.section(library_name)
+    except NotFound as exc:
+        print(f"Plex library {library_name!r} was not found: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+
+    genres = sorted(
+        {choice.title.strip() for choice in section.listFilterChoices("genre", libtype="track") if choice.title.strip()},
+        key=str.casefold,
+    )
+    if not genres:
+        print(f"No genres found in Plex library {library_name!r}.")
+        return
+
+    existing = {playlist.title.casefold() for playlist in plex.playlists()}
+    created = 0
+    skipped = 0
+    for genre in genres:
+        if genre.casefold() in existing:
+            print(f"SKIP  {genre} (a playlist with this title already exists)")
+            skipped += 1
+            continue
+        print(f"{'CREATE' if apply else 'WOULD CREATE'}  {genre}")
+        if apply:
+            section.createPlaylist(
+                title=genre,
+                smart=True,
+                libtype="track",
+                filters={"genre": genre},
+            )
+            created += 1
+
+    if apply:
+        print(f"Done: created {created} smart playlist(s); skipped {skipped} existing title(s).")
+    else:
+        print(f"Preview only: {len(genres) - skipped} playlist(s) would be created; {skipped} skipped.")
+        print("Rerun with --apply to create them.")
+
+
+if __name__ == "__main__":
+    app()

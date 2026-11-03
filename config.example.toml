@@ -1,0 +1,7 @@
+[plex]
+# Plex Media Server URL, including port.
+base_url = "http://localhost:32400"
+# Plex authentication token. Keep your real token private.
+token = "replace-me"
+# Name of the music library to use unless overridden with --library.
+default_library = "Music"

@@ -1,0 +1,3 @@
+# Local Plex credentials/configuration
+config.toml
+*.local.toml
