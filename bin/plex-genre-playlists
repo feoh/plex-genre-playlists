@@ -6,7 +6,7 @@
 #   "plexapi>=4.17,<5",
 # ]
 # ///
-"""Create one Plex smart playlist for each genre in a music library."""
+"""Create one Plex smart playlist for each album style in a music library."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from plexapi.exceptions import NotFound
 from plexapi.server import PlexServer
 
 DEFAULT_CONFIG = Path.home() / ".config/plex-genre-playlists/config.toml"
-app = cyclopts.App(help="Create genre-based smart playlists in a Plex music library.")
+app = cyclopts.App(help="Create style-based smart playlists in a Plex music library.")
 
 
 @app.default
@@ -58,36 +58,44 @@ def main(
         print(f"Plex library {library_name!r} was not found: {exc}", file=sys.stderr)
         raise SystemExit(2) from exc
 
-    genres = sorted(
-        {choice.title.strip() for choice in section.listFilterChoices("genre", libtype="track") if choice.title.strip()},
+    styles = sorted(
+        {
+            choice.title.strip()
+            for choice in section.listFilterChoices("style", libtype="album")
+            if choice.title.strip()
+        },
         key=str.casefold,
     )
-    if not genres:
-        print(f"No genres found in Plex library {library_name!r}.")
+    if not styles:
+        print(f"No album styles found in Plex library {library_name!r}.")
         return
 
     existing = {playlist.title.casefold() for playlist in plex.playlists()}
     created = 0
     skipped = 0
-    for genre in genres:
-        if genre.casefold() in existing:
-            print(f"SKIP  {genre} (a playlist with this title already exists)")
+    for style in styles:
+        if style.casefold() in existing:
+            print(f"SKIP  {style} (a playlist with this title already exists)")
             skipped += 1
             continue
-        print(f"{'CREATE' if apply else 'WOULD CREATE'}  {genre}")
+        print(f"{'CREATE' if apply else 'WOULD CREATE'}  {style}")
         if apply:
             section.createPlaylist(
-                title=genre,
+                title=style,
                 smart=True,
                 libtype="track",
-                filters={"genre": genre},
+                filters={"album.style": style},
             )
             created += 1
 
     if apply:
-        print(f"Done: created {created} smart playlist(s); skipped {skipped} existing title(s).")
+        print(
+            f"Done: created {created} smart playlist(s); skipped {skipped} existing title(s)."
+        )
     else:
-        print(f"Preview only: {len(genres) - skipped} playlist(s) would be created; {skipped} skipped.")
+        print(
+            f"Preview only: {len(styles) - skipped} playlist(s) would be created; {skipped} skipped."
+        )
         print("Rerun with --apply to create them.")
 
 

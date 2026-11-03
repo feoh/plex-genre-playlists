@@ -1,7 +1,7 @@
 # Plex Genre Playlists
 
-Create a Plex smart playlist for each genre in a music library using Plex's
-Python API.
+Create a Plex smart playlist for each album style in a music library using
+Plex's Python API. Each playlist contains tracks matched by `album.style`.
 
 ## Requirements
 
@@ -55,6 +55,7 @@ uv run --script bin/plex-genre-playlists --library "Another Music Library"
 uv run --script bin/plex-genre-playlists --config ~/secrets/plex.toml
 ```
 
-The script skips any genre whose exact playlist title already exists anywhere
-on the Plex server, so rerunning it does not create duplicates. Each generated
-playlist is a smart playlist filtered to tracks in that genre.
+The script discovers album styles, then creates a track smart playlist for each
+style using Plex's `album.style` filter. It skips any style whose exact playlist
+title already exists anywhere on the Plex server, so rerunning it does not
+create duplicates.
